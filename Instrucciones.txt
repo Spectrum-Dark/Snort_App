@@ -1,7 +1,0 @@
-#permisos de ejecucion
-
-#Limpiar y desinstalar snort
-#chmod +x Snort_Clear.sh
-
-#Instalacion completa
-#chmod +x Snort_Install.sh
