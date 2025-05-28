@@ -1,23 +1,12 @@
 #!/bin/bash
 
-backup_file() {
-  local file="$1"
-  if [ -f "$file" ]; then
-    sudo cp "$file" "${file}.backup.$(date +%Y%m%d%H%M%S)"
-    echo "💾 Backup creado para $file"
-  fi
-}
+# Script para automatizar tareas básicas en Linux con Snort
 
 echo "🔁 Actualizando el sistema..."
 sudo apt update && sudo apt upgrade -y
 
-echo "✅ Verificando repositorios en /etc/apt/sources.list..."
-REPO_PATTERN="http://ports.ubuntu.com/ubuntu-ports focal"
-if grep -q "$REPO_PATTERN" /etc/apt/sources.list; then
-  echo "🔍 Repositorios ya presentes, no se agregan."
-else
-  echo "➕ Añadiendo repositorios a /etc/apt/sources.list..."
-  sudo bash -c 'cat <<EOF >> /etc/apt/sources.list
+echo "✅ Añadiendo repositorios a /etc/apt/sources.list..."
+sudo bash -c 'cat <<EOF >> /etc/apt/sources.list
 
 deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports focal main restricted universe multiverse
 deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports focal-updates main restricted universe multiverse
@@ -27,88 +16,51 @@ deb [arch=i386,amd64] http://us.archive.ubuntu.com/ubuntu/ focal-updates main re
 deb [arch=i386,amd64] http://security.ubuntu.com/ubuntu focal-security main restricted universe multiverse
 
 EOF'
-fi
 
 echo "🔑 Registrando claves necesarias..."
-KEY1="3B4FE6ACC0B21F32"
-KEY2="871920D1991BC93C"
-
-check_key() {
-  sudo apt-key list | grep -q "$1"
-}
-
-if check_key "$KEY1"; then
-  echo "🔍 Clave $KEY1 ya registrada."
-else
-  echo "➕ Registrando clave $KEY1..."
-  sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys "$KEY1"
-fi
-
-if check_key "$KEY2"; then
-  echo "🔍 Clave $KEY2 ya registrada."
-else
-  echo "➕ Registrando clave $KEY2..."
-  sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys "$KEY2"
-fi
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 3B4FE6ACC0B21F32
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 871920D1991BC93C
 
 echo "🔁 Actualizando sistema global nuevamente..."
 sudo apt update && sudo apt upgrade -y
 
-echo "📦 Instalando Snort si no está instalado..."
-if dpkg -l | grep -qw snort; then
-  echo "✅ Snort ya está instalado."
-else
-  sudo apt install -y snort
-fi
+echo "📦 Instalando Snort..."
+sudo apt install -y snort
 
 echo "🔍 Validando archivos importantes..."
 
-CONF_FILE="/etc/snort/snort.conf"
-RULES_FILE="/etc/snort/rules/local.rules"
-
-if [ -f "$CONF_FILE" ]; then
-  echo "✅ Archivo encontrado: $CONF_FILE"
+if [ -f /etc/snort/snort.conf ]; then
+    echo "✅ Archivo encontrado: /etc/snort/snort.conf"
 else
-  echo "❌ Archivo NO encontrado: $CONF_FILE"
+    echo "❌ Archivo NO encontrado: /etc/snort/snort.conf"
 fi
 
-if [ -f "$RULES_FILE" ]; then
-  echo "✅ Archivo encontrado: $RULES_FILE"
+if [ -f /etc/snort/rules/local.rules ]; then
+    echo "✅ Archivo encontrado: /etc/snort/rules/local.rules"
 else
-  echo "❌ Archivo NO encontrado: $RULES_FILE"
+    echo "❌ Archivo NO encontrado: /etc/snort/rules/local.rules"
 fi
 
 echo "📝 Insertando regla básica ICMP en local.rules..."
-backup_file "$RULES_FILE"
-# Evitar regla duplicada
-if sudo grep -q 'alert icmp any any -> any any (msg:"Ping detectado"; sid:1000001; rev:1;)' "$RULES_FILE"; then
-  echo "🔍 Regla ICMP ya existe en $RULES_FILE"
-else
-  sudo bash -c "echo 'alert icmp any any -> any any (msg:\"Ping detectado\"; sid:1000001; rev:1;)' >> $RULES_FILE"
-  echo "➕ Regla ICMP agregada correctamente."
-fi
+sudo bash -c 'echo "alert icmp any any -> any any (msg:\"Ping detectado\"; sid:1000001; rev:1;)" >> /etc/snort/rules/local.rules'
 
 read -p "🌐 Ingresa la red para HOME_NET (ej. 192.168.1.0/24): " IP
 
 echo "⚙️ Configurando snort.conf..."
-backup_file "$CONF_FILE"
 
-if sudo grep -q 'include \$RULE_PATH/local.rules' "$CONF_FILE"; then
-  echo "✅ local.rules ya está incluido en $CONF_FILE"
+if sudo grep -q 'include \$RULE_PATH/local.rules' /etc/snort/snort.conf; then
+    echo "✅ local.rules ya está incluido en snort.conf"
 else
-  echo "➕ Añadiendo inclusión de local.rules en $CONF_FILE..."
-  sudo bash -c "echo 'include \$RULE_PATH/local.rules' >> $CONF_FILE"
+    echo "➕ Añadiendo inclusión de local.rules en snort.conf..."
+    sudo bash -c 'echo "include \$RULE_PATH/local.rules" >> /etc/snort/snort.conf'
 fi
 
-if sudo grep -q "^ipvar HOME_NET" "$CONF_FILE"; then
-  sudo sed -i "s#^ipvar HOME_NET.*#ipvar HOME_NET $IP#" "$CONF_FILE"
-  echo "✅ HOME_NET actualizado a $IP"
+if sudo grep -q "^ipvar HOME_NET" /etc/snort/snort.conf; then
+    sudo sed -i "s#^ipvar HOME_NET.*#ipvar HOME_NET $IP#" /etc/snort/snort.conf
+    echo "✅ HOME_NET actualizado a $IP"
 else
-  sudo bash -c "echo 'ipvar HOME_NET $IP' >> $CONF_FILE"
-  echo "✅ HOME_NET agregado como $IP"
+    sudo bash -c "echo 'ipvar HOME_NET $IP' >> /etc/snort/snort.conf"
+    echo "✅ HOME_NET agregado como $IP"
 fi
 
-read -p "📡 Ingresa el nombre de la interfaz de red para Snort (ej. eth0, enp0s3): " INTERFAZ
-
-echo "🚀 Ejecutando Snort en la interfaz $INTERFAZ..."
-sudo snort -A console -q -c "$CONF_FILE" -i "$INTERFAZ"
+echo "✅ Instalación y configuración completada con éxito 😈​"
