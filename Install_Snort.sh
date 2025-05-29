@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # ===============================
-# INSTALADOR DE SNORT 2.9.20 EN UBUNTU SERVER
-# Y PRUEBA DE PING ICMP
+# INSTALADOR DE SNORT 2.9.20 EN UBUNTU SERVER + REGLA ICMP (PING)
 # ===============================
 
 set -e
@@ -10,8 +9,20 @@ set -e
 echo "[+] Actualizando sistema..."
 sudo apt update && sudo apt upgrade -y
 
-echo "[+] Instalando dependencias necesarias..."
-sudo apt install -y build-essential libpcap-dev libpcre3-dev libdumbnet-dev bison flex zlib1g-dev liblzma-dev openssl libssl-dev ethtool net-tools iputils-ping
+echo "[+] Instalando dependencias..."
+sudo apt install -y build-essential libpcap-dev libpcre3-dev libdumbnet-dev bison flex \
+zlib1g-dev liblzma-dev openssl libssl-dev ethtool net-tools iputils-ping libnghttp2-dev \
+wget curl
+
+echo "[+] Instalando DAQ 2.0.7 (Data Acquisition Library)..."
+cd /tmp
+wget https://www.snort.org/downloads/snort/daq-2.0.7.tar.gz -O daq.tar.gz
+tar -xvzf daq.tar.gz
+cd daq-2.0.7
+./configure
+make
+sudo make install
+sudo ldconfig
 
 echo "[+] Creando usuario y grupo para Snort..."
 sudo groupadd -f snort
